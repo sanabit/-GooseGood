@@ -1,5 +1,4 @@
 
-using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.InputSystem;
 public class PlayerController : MonoBehaviour // 뒤에것을 상속받는 것 사실상 필수
@@ -9,10 +8,27 @@ public class PlayerController : MonoBehaviour // 뒤에것을 상속받는 것 �
     // 설정 및 보관용 변수 선언
     [Header("이동 및 점프 설정")] // 인스펙터 창에 속성 이름표
     [SerializeField] private float moveSpeed = 5f; // 거위의 이동속도. (인스펙터에서 조정 가능)
-    [SerializeField] private float jumpForce =10f;
+    // 유니티 인스펙터에 이 변수를 보여달라고 하는 것 private여도 조정 가능하게 여기서
+    [SerializeField] private float jumpForce =12f;
     // private 지만 유니티 인스펙터에서 조정가능하도록 
+
+
+    [Header("지면 감지 설정")]
+    [SerializeField] private Transform groundCheck; // 발 밑 위치
+    // transform 은 모든 오브젝트가 갖고 있는 위치, 회전, 크기정보를 담는 컴포넌트
+    [SerializeField] private Vector2 groundCheckSize = new Vector2(0.5f, 0.1f) ; // 감지할 사각형의 크기
+    [SerializeField] private LayerMask gruondLayer; //바닥으로 인식할 레이어 지정
+
+    [Header("중력 및 가변 점프 설정")]
+    [SerializeField] private float defaultGravity = 1f; // 기본중력 배율
+    [SerializeField] private float fallMultiplier = 3f; // 떨어질 때 적용할 중력
+    [SerializeField] private float lowJumpMultiplier = 2.5f; // 살짝 점프 할 때의 중력
+
+
     private Rigidbody2D rb; //리지드바디 컴포넌트 (물리엔진조작)
     private float xInput; // onmove에서 넘어온 좌우 입력값 임시로 담아두는 곳
+    private bool isGrounded; // 현재 땅에 있니?
+    private bool isJumpPressed; // 점프키 누르고 있니?
 
     // 초기화 
     private void Awake() // 이 void는 이 함수 실행 끝난이후 아무런 값 리턴 x라는 뜻
@@ -21,6 +37,16 @@ public class PlayerController : MonoBehaviour // 뒤에것을 상속받는 것 �
         rb = GetComponent<Rigidbody2D>();
         //거위 오브젝트에 붙어있는 리지드바디를 미리 rb에 넣어둠
     }
+
+    // 지면 감지 영역
+    //groundcheck 위치에서  설정한 반지름 크기의 원을 그려서 gorundlayer와 닿아있으면 true로 반환
+    // 이거 아마 레이어 그룹으로 가능할 듯? 
+    private void Update()
+    {
+        isGrounded = Physics2D.OverlapBox(groundCheck.position, groundCheckSize, 0f, gruondLayer);
+        
+        ApplyGravity();
+    } // 위치, 사각형 크기, 회전각도(세타), 감지할 레이어
 
     // 입력 이벤트 수신 영역
     
@@ -55,9 +81,25 @@ public class PlayerController : MonoBehaviour // 뒤에것을 상속받는 것 �
 
     private void OnJump(InputValue value)
     {
-        if (value.isPressed) // 버튼이 눌린순간 true됨
-        {// x 축 속도 유지, y축은 점프 힘만큼 점프
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+        if (value.isPressed)
+        {
+            isJumpPressed = true; // 점프 누른 상태 저장
+            Debug.Log("점프 누름!");
+            if (isGrounded)
+            {
+                // x 축 속도 유지, y축은 점프 힘만큼 점프
+                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+            }
+        } // 버튼이 눌린순간 true됨 + 땅에 있을 때만
+        else
+        {// onjump 는 점프키를 뗀 순간에도 한번 더 실행된다. 상태가 변화할 때마다 실행되는 것
+            isJumpPressed = false; // 점프키 뗀 상태 저장
+            Debug.Log("점프 뗌!");
+
+            if (rb.linearVelocity.y > 0)
+            { // 상승중 손 떼면 반토막
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x , rb.linearVelocity.y * 0.5f);
+            }
         }
     }
         // 물리 연산 영역
@@ -68,4 +110,32 @@ public class PlayerController : MonoBehaviour // 뒤에것을 상속받는 것 �
         rb.linearVelocity = new Vector2(xInput * moveSpeed, rb.linearVelocity.y);
     }
     
+    // 중력조절 영역
+    private void ApplyGravity()
+    {// 1. 공중에서 하강할 때 강한 중력 작용
+        if (rb.linearVelocity.y < 0)
+        {
+            rb.gravityScale = fallMultiplier;
+        }
+        
+        else if (rb.linearVelocity.y > 0 && !isJumpPressed)
+        {// 2. 상승하는 도중 점프키를 뗏을 때
+            rb.gravityScale = lowJumpMultiplier;
+        }
+
+        else
+        {
+            rb.gravityScale = defaultGravity;
+        }
+    }
+
+    // 감지범위 확인
+    private void OnDrawGizmosSelected()
+    {
+        if (groundCheck != null)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireCube(groundCheck.position, groundCheckSize);
+        }
+    }
 }
