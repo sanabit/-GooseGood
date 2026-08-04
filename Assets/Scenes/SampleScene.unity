@@ -723,6 +723,7 @@ MonoBehaviour:
   defaultGravity: 3
   fallMultiplier: 4
   lowJumpMultiplier: 3.5
+  jumpBufferTime: 0.1
 --- !u!1 &1714903198
 GameObject:
   m_ObjectHideFlags: 0
